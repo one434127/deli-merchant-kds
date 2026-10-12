@@ -93,7 +93,6 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = { setTab("86") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "86") Color(0xFFE53E3E) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("86 / STOCK", fontWeight = FontWeight.Bold) }
             }
-            }
             Button(onClick = onSync, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A5568)), modifier = Modifier.fillMaxWidth().height(46.dp)) { Text("SYNC NOW", fontWeight = FontWeight.Bold) }
         }
         Box(Modifier.fillMaxSize().padding(16.dp)) {
