@@ -76,7 +76,7 @@ fun MerchantKdsApp() {
                     val itm = OrderItem(o.optInt("id"), o.optString("customer_name", "Walk-In"), o.optString("pickup_time", "ASAP"), o.optString("items", ""), st, o.optString("payment_status", "UNPAID"), o.optString("total_price", "0.00"), fmtTime(cr))
                     if (st != "Picked Up") pa.add(itm) else if (isTodayOrder(cr)) pd.add(itm)
                 }
-                val mj = JSONArray(URL("$BASE_URL/api/menu").readText())
+                val mj = JSONArray(URL("$BASE_URL/api/menu?all=true").readText())
                 menu = (0 until mj.length()).map { val m = mj.getJSONObject(it); MenuStockItem(m.optInt("id"), m.optString("name"), m.optString("category", "Menu"), m.optString("price", "0.00"), m.optBoolean("is_available", true)) }
                 val ij = JSONArray(URL("$BASE_URL/api/ingredients").readText())
                 ings = (0 until ij.length()).map { val g = ij.getJSONObject(it); MenuStockItem(g.optInt("id"), g.optString("name"), g.optString("category", "Ing"), g.optString("extra_price", "0.00"), g.optBoolean("is_available", true)) }
