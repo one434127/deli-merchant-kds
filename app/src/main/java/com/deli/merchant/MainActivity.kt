@@ -37,7 +37,7 @@ fun fmtTime(s: String): String {
         val inst = Instant.parse(s)
         val m = Duration.between(inst, Instant.now()).toMinutes()
         val c = inst.atZone(ZoneId.of("America/New_York")).format(DateTimeFormatter.ofPattern("h:mm a"))
-        if (m < 1) "Just now ($c)" else if (m < 60) "${m}m ago ($c)" else "${m/60}h ${m\%60}m ago ($c)"
+        if (m < 1) "Just now (" + c + ")" else if (m < 60) m.toString() + "m ago (" + c + ")" else (m/60).toString() + "h ago (" + c + ")"
     } catch (_: Exception) { "" }
 }
 class MainActivity : ComponentActivity() {
