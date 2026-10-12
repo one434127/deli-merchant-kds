@@ -49,6 +49,72 @@ data class MenuStockItem(
     val isIngredient: Boolean = false
 )
 
+fun formatItemsForKitchen(rawItems: Any?): String {
+    if (rawItems == null) return "No items listed"
+    val str = rawItems.toString().trim()
+    if (str.isEmpty() || str == "null") return "No items listed"
+
+    try {
+        val arr = when (rawItems) {
+            is JSONArray -> rawItems
+            else -> if (str.startsWith("[")) JSONArray(str) else null
+        }
+        if (arr != null) {
+            val lines = mutableListOf<String>()
+            for (i in 0 until arr.length()) {
+                val item = arr.get(i)
+                if (item is JSONObject) {
+                    val qty = item.optInt("quantity", item.optInt("qty", 1))
+                    val name = item.optString("name", item.optString("item_name", item.optString("title", "Item")))
+                    var line = "• ${qty}x $name"
+
+                    val mods = mutableListOf<String>()
+                    val cust = item.optString("customizations", item.optString("notes", item.optString("special_instructions", "")))
+                    if (cust.isNotEmpty() && cust != "null" && cust != "[]") {
+                        mods.add(cust)
+                    }
+
+                    val removed = item.optJSONArray("removed_ingredients") ?: item.optJSONArray("removed")
+                    if (removed != null && removed.length() > 0) {
+                        val remList = (0 until removed.length()).map { removed.getString(it) }
+                        mods.add("NO: ${remList.joinToString(", ")}")
+                    }
+
+                    val added = item.optJSONArray("added_ingredients") ?: item.optJSONArray("extras") ?: item.optJSONArray("addons")
+                    if (added != null && added.length() > 0) {
+                        val addList = (0 until added.length()).map {
+                            val el = added.get(it)
+                            if (el is JSONObject) el.optString("name", el.toString()) else el.toString()
+                        }
+                        mods.add("ADD: ${addList.joinToString(", ")}")
+                    }
+
+                    val ingArr = item.optJSONArray("ingredients")
+                    if (ingArr != null && ingArr.length() > 0) {
+                        val ingList = (0 until ingArr.length()).map {
+                            val el = ingArr.get(it)
+                            if (el is JSONObject) el.optString("name", el.toString()) else el.toString()
+                        }
+                        mods.add("With: ${ingList.joinToString(", ")}")
+                    }
+
+                    if (mods.isNotEmpty()) {
+                        line += "\n   ↳ " + mods.joinToString(" | ")
+                    }
+                    lines.add(line)
+                } else {
+                    lines.add("• $item")
+                }
+            }
+            if (lines.isNotEmpty()) return lines.joinToString("\n")
+        }
+    } catch (_: Exception) {}
+
+    return str
+        .replace(Regex("[\\[\\]{}\"]"), "")
+        .replace(",", ", ")
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,11 +147,12 @@ fun MerchantKdsApp() {
                     val o = ordersJson.getJSONObject(i)
                     val st = o.optString("status", "Pending")
                     if (st != "Picked Up") {
+                        val rawItemsObj = o.opt("items") ?: o.opt("order_items") ?: ""
                         parsedOrders.add(
                             OrderItem(
                                 id = o.optInt("id"),
                                 customerName = o.optString("customer_name", "Walk-In"),
-                                itemsSummary = o.optString("items", ""),
+                                itemsSummary = formatItemsForKitchen(rawItemsObj),
                                 status = st,
                                 paymentStatus = o.optString("payment_status", "UNPAID"),
                                 total = o.optString("total_price", "0.00")
@@ -325,9 +392,9 @@ fun TicketCard(order: OrderItem, onAdvance: (String) -> Unit) {
                 )
             }
             Spacer(Modifier.height(6.dp))
-            Text("Status: ${order.status}", color = Color(0xFFA0AEC0), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(10.dp))
-            Text(order.itemsSummary, color = Color.White, fontSize = 16.sp)
+            Text("Status: ${order.status} • $${order.total}", color = Color(0xFFA0AEC0), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text(order.itemsSummary, color = Color.White, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { onAdvance(nextStatus) },
