@@ -37,7 +37,3 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
-
-
-}
-}
