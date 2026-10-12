@@ -89,7 +89,7 @@ fun MerchantKdsApp() {
                 val s = sj.optBoolean("allow_prepay_stripe", true)
                 allowReg = r; allowStripe = s
                 if (r || s) { savedReg = r; savedStripe = s }
-                active = pa; done = pd; online = true
+                active = pa.sortedBy { it.id }; done = pd; online = true
             } catch (_: Exception) { online = false }
         }
     }
