@@ -2,6 +2,8 @@ package com.deli.merchant
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.WindowManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -40,6 +42,13 @@ fun fmtTime(s: String): String {
         if (m < 1) "Just now (" + c + ")" else if (m < 60) m.toString() + "m ago (" + c + ")" else (m/60).toString() + "h ago (" + c + ")"
     } catch (_: Exception) { "" }
 }
+fun playChime() {
+    try {
+        val tg = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+        tg.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 400)
+    } catch (_: Exception) {}
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -75,7 +84,24 @@ fun MerchantKdsApp() {
             } catch (_: Exception) { online = false }
         }
     }
-    LaunchedEffect(Unit) { while (true) { sync(); delay(3000) } }
+    LaunchedEffect(Unit) {
+        var tick = 0
+        var prevPendingCount = 0
+        while (true) {
+            sync()
+            val curPending = active.count { it.status == "Pending" }
+            if (curPending > 0) {
+                if (curPending > prevPendingCount || tick % 5 == 0) {
+                    playChime()
+                }
+                tick++
+            } else {
+                tick = 0
+            }
+            prevPendingCount = curPending
+            delay(3000)
+        }
+    }
     KdsLayout(tab, { tab = it }, active, done, menu, ings, online) { scope.launch { sync() } }
 }
 @Composable

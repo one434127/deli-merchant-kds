@@ -11,8 +11,17 @@ android {
         applicationId = "com.deli.merchant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.2"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("kds-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildFeatures {
