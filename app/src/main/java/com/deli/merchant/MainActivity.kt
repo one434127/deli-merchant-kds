@@ -1,5 +1,6 @@
 package com.deli.merchant
 
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -7,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,14 +45,15 @@ data class MenuStockItem(
     val name: String,
     val category: String,
     val price: String,
-    val available: Boolean
+    val available: Boolean,
+    val isIngredient: Boolean = false
 )
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Keep kitchen tablet screen awake at all times
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         setContent {
             MaterialTheme {
                 MerchantKdsApp()
@@ -64,6 +67,7 @@ fun MerchantKdsApp() {
     var selectedTab by remember { mutableStateOf("TICKETS") }
     var orders by remember { mutableStateOf(listOf<OrderItem>()) }
     var menuItems by remember { mutableStateOf(listOf<MenuStockItem>()) }
+    var ingredientItems by remember { mutableStateOf(listOf<MenuStockItem>()) }
     var isConnected by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -95,19 +99,40 @@ fun MerchantKdsApp() {
                 val parsedMenu = mutableListOf<MenuStockItem>()
                 for (i in 0 until menuJson.length()) {
                     val m = menuJson.getJSONObject(i)
+                    val avail = if (m.has("is_available")) m.optBoolean("is_available", true) else m.optBoolean("available", true)
                     parsedMenu.add(
                         MenuStockItem(
                             id = m.optInt("id"),
                             name = m.optString("name"),
-                            category = m.optString("category", "Deli"),
+                            category = m.optString("category", "Menu Item"),
                             price = m.optString("price", "0.00"),
-                            available = m.optBoolean("available", true)
+                            available = avail,
+                            isIngredient = false
+                        )
+                    )
+                }
+
+                val ingRaw = URL("$BASE_URL/api/ingredients").readText()
+                val ingJson = JSONArray(ingRaw)
+                val parsedIng = mutableListOf<MenuStockItem>()
+                for (i in 0 until ingJson.length()) {
+                    val ing = ingJson.getJSONObject(i)
+                    val avail = if (ing.has("is_available")) ing.optBoolean("is_available", true) else ing.optBoolean("available", true)
+                    parsedIng.add(
+                        MenuStockItem(
+                            id = ing.optInt("id"),
+                            name = ing.optString("name"),
+                            category = ing.optString("category", "Ingredient"),
+                            price = ing.optString("extra_price", ing.optString("price", "0.00")),
+                            available = avail,
+                            isIngredient = true
                         )
                     )
                 }
 
                 orders = parsedOrders
                 menuItems = parsedMenu
+                ingredientItems = parsedIng
                 isConnected = true
             } catch (e: Exception) {
                 isConnected = false
@@ -118,87 +143,143 @@ fun MerchantKdsApp() {
     LaunchedEffect(Unit) {
         while (true) {
             refreshData()
-            delay(4000)
+            delay(3000)
         }
     }
 
     Row(modifier = Modifier.fillMaxSize().background(Color(0xFF12161F))) {
-        NavigationRail(
-            containerColor = Color(0xFF0B0E14),
-            contentColor = Color.White,
-            modifier = Modifier.fillMaxHeight().width(100.dp)
+        Column(
+            modifier = Modifier
+                .width(220.dp)
+                .fillMaxHeight()
+                .background(Color(0xFF1A202C))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(Modifier.height(20.dp))
-            Text("DELI KDS", color = Color(0xFFFFB300), fontWeight = FontWeight.Black, fontSize = 15.sp)
-            Spacer(Modifier.height(32.dp))
-            NavigationRailItem(
-                selected = selectedTab == "TICKETS",
-                onClick = { selectedTab = "TICKETS" },
-                icon = { Text("🧾", fontSize = 24.sp) },
-                label = { Text("Tickets (${orders.size})", color = Color.White) }
-            )
-            Spacer(Modifier.height(16.dp))
-            NavigationRailItem(
-                selected = selectedTab == "86_BOARD",
-                onClick = { selectedTab = "86_BOARD" },
-                icon = { Text("🚫", fontSize = 24.sp) },
-                label = { Text("86 Board", color = Color.White) }
-            )
-        }
-
-        Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column {
+                Text("DELI KDS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = if (selectedTab == "TICKETS") "Live Kitchen Order Tickets" else "86 Inventory Stock Board",
-                    color = Color.White,
-                    fontSize = 26.sp,
+                    if (isConnected) "● LIVE ONLINE" else "● RECONNECTING...",
+                    color = if (isConnected) Color(0xFF48BB78) else Color(0xFFF56565),
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Surface(
-                    color = if (isConnected) Color(0xFF1B3B2B) else Color(0xFF451A1A),
-                    shape = RoundedCornerShape(50)
+                Spacer(Modifier.height(28.dp))
+
+                Button(
+                    onClick = { selectedTab = "TICKETS" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedTab == "TICKETS") Color(0xFF3182CE) else Color(0xFF2D3748)
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text(
-                        text = if (isConnected) "● LIVE: 158.101.96.169:3000" else "● RECONNECTING...",
-                        color = if (isConnected) Color(0xFF4ADE80) else Color(0xFFF87171),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("ACTIVE TICKETS (${orders.size})", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = { selectedTab = "86_BOARD" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedTab == "86_BOARD") Color(0xFFE53E3E) else Color(0xFF2D3748)
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("86 / STOCK BOARD", fontWeight = FontWeight.Bold)
                 }
             }
 
+            Button(
+                onClick = { scope.launch { refreshData() } },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A5568)),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("SYNC NOW", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize().padding(18.dp)) {
             if (selectedTab == "TICKETS") {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(orders) { order ->
-                        OrderCard(order) { nextStatus ->
-                            scope.launch(Dispatchers.IO) {
-                                postJson("$BASE_URL/api/orders/${order.id}/status", JSONObject().put("status", nextStatus).toString())
-                                refreshData()
-                            }
+                if (orders.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No Active Kitchen Tickets", color = Color.Gray, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(orders) { order ->
+                            TicketCard(
+                                order = order,
+                                onAdvance = { nextStatus ->
+                                    scope.launch(Dispatchers.IO) {
+                                        val body = JSONObject().apply {
+                                            put("status", nextStatus)
+                                            if (nextStatus == "Picked Up") {
+                                                put("payment_status", "PAID")
+                                            }
+                                        }
+                                        postJson("$BASE_URL/api/orders/${order.id}", body.toString())
+                                        refreshData()
+                                    }
+                                }
+                            )
                         }
                     }
                 }
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    item(span = { GridItemSpan(3) }) {
+                        Text(
+                            "MENU ITEMS (${menuItems.size})",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        )
+                    }
                     items(menuItems) { item ->
-                        StockCard(item) {
-                            scope.launch(Dispatchers.IO) {
-                                postJson("$BASE_URL/api/menu/${item.id}/toggle", "{}")
-                                refreshData()
+                        StockCard(
+                            item = item,
+                            onToggle = {
+                                scope.launch(Dispatchers.IO) {
+                                    val body = JSONObject().put("is_available", !item.available)
+                                    postJson("$BASE_URL/api/menu/${item.id}/availability", body.toString())
+                                    refreshData()
+                                }
                             }
-                        }
+                        )
+                    }
+                    item(span = { GridItemSpan(3) }) {
+                        Text(
+                            "INGREDIENTS & ADD-ONS (${ingredientItems.size})",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)
+                        )
+                    }
+                    items(ingredientItems) { ing ->
+                        StockCard(
+                            item = ing,
+                            onToggle = {
+                                scope.launch(Dispatchers.IO) {
+                                    val body = JSONObject().put("is_available", !ing.available)
+                                    postJson("$BASE_URL/api/ingredients/${ing.id}/availability", body.toString())
+                                    refreshData()
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -207,53 +288,54 @@ fun MerchantKdsApp() {
 }
 
 @Composable
-fun OrderCard(order: OrderItem, onAdvance: (String) -> Unit) {
-    val headerColor = when (order.status) {
-        "In Prep" -> Color(0xFF2563EB)
-        "Ready" -> Color(0xFF059669)
-        else -> Color(0xFFD97706)
-    }
-    val nextAction = when (order.status) {
+fun TicketCard(order: OrderItem, onAdvance: (String) -> Unit) {
+    val nextStatus = when (order.status) {
+        "Pending" -> "In Prep"
         "In Prep" -> "Ready"
-        "Ready" -> "Picked Up"
-        else -> "In Prep"
+        else -> "Picked Up"
     }
     val buttonLabel = when (order.status) {
+        "Pending" -> "START PREP"
         "In Prep" -> "MARK READY"
-        "Ready" -> "PICKED UP & PAID"
-        else -> "START PREP"
+        else -> "PICKED UP (COMPLETE)"
+    }
+    val buttonColor = when (order.status) {
+        "Pending" -> Color(0xFFD69E2E)
+        "In Prep" -> Color(0xFF3182CE)
+        else -> Color(0xFF38A169)
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().background(headerColor).padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("#${order.id} • ${order.customerName}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                Text(order.status.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Column(modifier = Modifier.padding(16.dp)) {
+                Text("#${order.id} • ${order.customerName}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
                 Text(
-                    text = if (order.paymentStatus == "PAID") "✅ PAID ($${order.total})" else "💵 PAY AT REGISTER ($${order.total})",
-                    color = if (order.paymentStatus == "PAID") Color(0xFF4ADE80) else Color(0xFFFBBF24),
-                    fontWeight = FontWeight.Bold
+                    order.paymentStatus,
+                    color = if (order.paymentStatus == "PAID") Color(0xFF48BB78) else Color(0xFFF56565),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
                 )
-                Spacer(Modifier.height(10.dp))
-                Text(order.itemsSummary, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(18.dp))
-                Button(
-                    onClick = { onAdvance(nextAction) },
-                    colors = ButtonDefaults.buttonColors(containerColor = headerColor),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) {
-                    Text(buttonLabel, fontWeight = FontWeight.Black, fontSize = 16.sp)
-                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("Status: ${order.status}", color = Color(0xFFA0AEC0), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(10.dp))
+            Text(order.itemsSummary, color = Color.White, fontSize = 16.sp)
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { onAdvance(nextStatus) },
+                colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(buttonLabel, fontWeight = FontWeight.Black, fontSize = 16.sp)
             }
         }
     }
