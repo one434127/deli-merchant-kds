@@ -39,7 +39,7 @@ fun fmtTime(s: String): String {
         val inst = Instant.parse(s)
         val m = Duration.between(inst, Instant.now()).toMinutes()
         val c = inst.atZone(ZoneId.of("America/New_York")).format(DateTimeFormatter.ofPattern("h:mm a"))
-        if (m < 1) "Just now (" + c + ")" else if (m < 60) m.toString() + "m ago (" + c + ")" else (m/60).toString() + "h ago (" + c + ")"
+        if (m < 1) "Just now (" + c + ")" else if (m < 60) m.toString() + "m ago (" + c + ")" else (m/60).toString() + "h " + (m%60).toString() + "m ago (" + c + ")"
     } catch (_: Exception) { "" }
 }
 fun playChime() {
@@ -65,6 +65,10 @@ fun MerchantKdsApp() {
     var menu by remember { mutableStateOf(listOf<MenuStockItem>()) }
     var ings by remember { mutableStateOf(listOf<MenuStockItem>()) }
     var online by remember { mutableStateOf(false) }
+    var allowReg by remember { mutableStateOf(true) }
+    var allowStripe by remember { mutableStateOf(true) }
+    var savedReg by remember { mutableStateOf(true) }
+    var savedStripe by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     suspend fun sync() {
         withContext(Dispatchers.IO) {
@@ -80,6 +84,11 @@ fun MerchantKdsApp() {
                 menu = (0 until mj.length()).map { val m = mj.getJSONObject(it); MenuStockItem(m.optInt("id"), m.optString("name"), m.optString("category", "Menu"), m.optString("price", "0.00"), m.optBoolean("is_available", true)) }
                 val ij = JSONArray(URL("$BASE_URL/api/ingredients").readText())
                 ings = (0 until ij.length()).map { val g = ij.getJSONObject(it); MenuStockItem(g.optInt("id"), g.optString("name"), g.optString("category", "Ing"), g.optString("extra_price", "0.00"), g.optBoolean("is_available", true)) }
+                val sj = JSONObject(URL("$BASE_URL/api/settings").readText())
+                val r = sj.optBoolean("allow_pay_at_register", true)
+                val s = sj.optBoolean("allow_prepay_stripe", true)
+                allowReg = r; allowStripe = s
+                if (r || s) { savedReg = r; savedStripe = s }
                 active = pa; done = pd; online = true
             } catch (_: Exception) { online = false }
         }
@@ -102,16 +111,21 @@ fun MerchantKdsApp() {
             delay(3000)
         }
     }
-    KdsLayout(tab, { tab = it }, active, done, menu, ings, online) { scope.launch { sync() } }
+    KdsLayout(tab, { tab = it }, active, done, menu, ings, online, allowReg, allowStripe, savedReg, savedStripe) { scope.launch { sync() } }
 }
 @Composable
-fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done: List<OrderItem>, menu: List<MenuStockItem>, ings: List<MenuStockItem>, online: Boolean, onSync: ()->Unit) {
+fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done: List<OrderItem>, menu: List<MenuStockItem>, ings: List<MenuStockItem>, online: Boolean, allowReg: Boolean, allowStripe: Boolean, savedReg: Boolean, savedStripe: Boolean, onSync: ()->Unit) {
     val scope = rememberCoroutineScope()
+    val isPaused = !allowReg && !allowStripe
     Row(Modifier.fillMaxSize().background(Color(0xFF12161F))) {
         Column(Modifier.width(225.dp).fillMaxHeight().background(Color(0xFF1A202C)).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("DELI KDS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
                 Text(if (online) "● LIVE ONLINE" else "● OFFLINE", color = if (online) Color(0xFF48BB78) else Color(0xFFF56565), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                if (isPaused) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("⚠️ ORDERS PAUSED", color = Color(0xFFF56565), fontSize = 13.sp, fontWeight = FontWeight.Black)
+                }
                 Spacer(Modifier.height(20.dp))
                 Button(onClick = { setTab("TICKETS") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "TICKETS") Color(0xFF3182CE) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("ACTIVE (${active.size})", fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(10.dp))
@@ -130,6 +144,45 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
                 }
             } else {
                 LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    item(span = { GridItemSpan(3) }) {
+                        Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (isPaused) "🔴 ORDERING IS PAUSED" else "🟢 ACCEPTING NEW ORDERS", color = if (isPaused) Color(0xFFF87171) else Color(0xFF4ADE80), fontSize = 18.sp, fontWeight = FontWeight.Black)
+                                    Button(
+                                        onClick = {
+                                            scope.launch(Dispatchers.IO) {
+                                                val body = if (isPaused) {
+                                                    JSONObject().put("allow_pay_at_register", if (!savedReg && !savedStripe) true else savedReg).put("allow_prepay_stripe", if (!savedReg && !savedStripe) true else savedStripe)
+                                                } else {
+                                                    JSONObject().put("allow_pay_at_register", false).put("allow_prepay_stripe", false)
+                                                }
+                                                putJson("$BASE_URL/api/settings", body.toString())
+                                                onSync()
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (isPaused) Color(0xFF16A34A) else Color(0xFFDC2626)),
+                                        modifier = Modifier.height(48.dp)
+                                    ) {
+                                        Text(if (isPaused) "▶️ RESUME ORDERS" else "⏸️ PAUSE ALL ORDERS", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(
+                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings", JSONObject().put("allow_pay_at_register", !allowReg).put("allow_prepay_stripe", allowStripe).toString()); onSync() } },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (allowReg) Color(0xFF2563EB) else Color(0xFF475569)),
+                                        modifier = Modifier.weight(1f).height(42.dp)
+                                    ) { Text(if (allowReg) "💵 Pay at Register: ON" else "💵 Pay at Register: OFF", fontWeight = FontWeight.Bold) }
+                                    Button(
+                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings", JSONObject().put("allow_pay_at_register", allowReg).put("allow_prepay_stripe", !allowStripe).toString()); onSync() } },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (allowStripe) Color(0xFF2563EB) else Color(0xFF475569)),
+                                        modifier = Modifier.weight(1f).height(42.dp)
+                                    ) { Text(if (allowStripe) "💳 Prepay Stripe: ON" else "💳 Prepay Stripe: OFF", fontWeight = FontWeight.Bold) }
+                                }
+                            }
+                        }
+                    }
                     item(span = { GridItemSpan(3) }) { Text("MENU ITEMS (${menu.size})", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black) }
                     items(menu) { m -> StockCard(m) { scope.launch(Dispatchers.IO) { postJson("$BASE_URL/api/menu/${m.id}/availability", JSONObject().put("is_available", !m.available).toString()); onSync() } } }
                     item(span = { GridItemSpan(3) }) { Text("INGREDIENTS (${ings.size})", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black) }
@@ -142,7 +195,7 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
 @Composable
 fun TicketCard(o: OrderItem, isDone: Boolean, onAdv: (String)->Unit) {
     val nextSt = if (isDone) "Ready" else when (o.status) { "Pending" -> "In Prep"; "In Prep" -> "Ready"; else -> "Picked Up" }
-    val lbl = if (isDone) "↺ RECALL TO ACTIVE" else when (o.status) { "Pending" -> "START PREP"; "In Prep" -> "MARK READY"; else -> "PICKED UP" }
+    val lbl = if (isDone) "↩ RECALL TO ACTIVE" else when (o.status) { "Pending" -> "START PREP"; "In Prep" -> "MARK READY"; else -> "PICKED UP" }
     val col = if (isDone) Color(0xFF4A5568) else when (o.status) { "Pending" -> Color(0xFFD69E2E); "In Prep" -> Color(0xFF3182CE); else -> Color(0xFF38A169) }
     Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
@@ -151,7 +204,7 @@ fun TicketCard(o: OrderItem, isDone: Boolean, onAdv: (String)->Unit) {
                 Text(o.paymentStatus, color = if (o.paymentStatus == "PAID") Color(0xFF48BB78) else Color(0xFFF56565), fontWeight = FontWeight.Bold)
             }
             if (o.timeLabel.isNotEmpty()) Text("${o.timeLabel} • ${o.pickupTime}", color = Color(0xFF63B3ED), fontSize = 12.sp)
-            Text("Status: ${o.status} • ${o.total}", color = Color(0xFFA0AEC0), fontSize = 13.sp)
+            Text("Status: ${o.status} • $${o.total}", color = Color(0xFFA0AEC0), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Text(o.itemsSummary, color = Color.White, fontSize = 16.sp, lineHeight = 22.sp)
             Spacer(Modifier.height(12.dp))
@@ -161,13 +214,14 @@ fun TicketCard(o: OrderItem, isDone: Boolean, onAdv: (String)->Unit) {
 }
 @Composable
 fun StockCard(i: MenuStockItem, onToggle: ()->Unit) {
-    Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)), modifier = Modifier.fillMaxWidth()) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Text(i.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text("${i.category} • ${i.price}", color = Color(0xFF94A3B8), fontSize = 13.sp)
+            Text("${i.category} • $${i.price}", color = Color(0xFF94A3B8), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Button(onClick = onToggle, colors = ButtonDefaults.buttonColors(containerColor = if (i.available) Color(0xFF059669) else Color(0xFFDC2626)), modifier = Modifier.fillMaxWidth().height(44.dp)) { Text(if (i.available) "IN STOCK (TAP TO 86)" else "86'd / OUT OF STOCK", fontWeight = FontWeight.Bold) }
         }
     }
 }
 fun postJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
+fun putJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "PUT"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
