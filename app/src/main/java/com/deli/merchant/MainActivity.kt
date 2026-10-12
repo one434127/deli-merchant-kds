@@ -125,7 +125,7 @@ fun TicketCard(o: OrderItem, isDone: Boolean, onAdv: (String)->Unit) {
                 Text(o.paymentStatus, color = if (o.paymentStatus == "PAID") Color(0xFF48BB78) else Color(0xFFF56565), fontWeight = FontWeight.Bold)
             }
             if (o.timeLabel.isNotEmpty()) Text("${o.timeLabel} • ${o.pickupTime}", color = Color(0xFF63B3ED), fontSize = 12.sp)
-            Text("Status: ${o.status} • $${o.total}", color = Color(0xFFA0AEC0), fontSize = 13.sp)
+            Text("Status: ${o.status} • \$${o.total}", color = Color(0xFFA0AEC0), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Text(o.itemsSummary, color = Color.White, fontSize = 16.sp, lineHeight = 22.sp)
             Spacer(Modifier.height(12.dp))
@@ -138,7 +138,7 @@ fun StockCard(i: MenuStockItem, onToggle: ()->Unit) {
     Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Text(i.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text("${i.category} • $${i.price}", color = Color(0xFF94A3B8), fontSize = 13.sp)
+            Text("${i.category} • \$${i.price}", color = Color(0xFF94A3B8), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Button(onClick = onToggle, colors = ButtonDefaults.buttonColors(containerColor = if (i.available) Color(0xFF059669) else Color(0xFFDC2626)), modifier = Modifier.fillMaxWidth().height(44.dp)) { Text(if (i.available) "IN STOCK (TAP TO 86)" else "86'd / OUT OF STOCK", fontWeight = FontWeight.Bold) }
         }
