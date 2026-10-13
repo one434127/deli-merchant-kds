@@ -93,7 +93,7 @@ val oj = JSONArray(URL("$BASE_URL/api/orders?store_id=$curStoreId").readText())
                 menu = (0 until mj.length()).map { val m = mj.getJSONObject(it); MenuStockItem(m.optInt("id"), m.optString("name"), m.optString("category", "Menu"), m.optString("price", "0.00"), m.optBoolean("is_available", true)) }
                 val ij = JSONArray(URL("$BASE_URL/api/ingredients?store_id=$curStoreId").readText())
                 ings = (0 until ij.length()).map { val g = ij.getJSONObject(it); MenuStockItem(g.optInt("id"), g.optString("name"), g.optString("category", "Ing"), g.optString("extra_price", "0.00"), g.optBoolean("is_available", true)) }
-                val sj = JSONObject(URL("$BASE_URL/api/settings").readText())
+                val sj = JSONObject(URL("$BASE_URL/api/settings?store_id=$curStoreId").readText())
                 val r = sj.optBoolean("allow_pay_at_register", true)
                 val s = sj.optBoolean("allow_prepay_stripe", true)
                 allowReg = r; allowStripe = s
@@ -169,7 +169,7 @@ AdminStoreModal(onSync)
                                                 } else {
                                                     JSONObject().put("allow_pay_at_register", false).put("allow_prepay_stripe", false)
                                                 }
-                                                putJson("$BASE_URL/api/settings", body.toString())
+                                                putJson("$BASE_URL/api/settings?store_id=$curStoreId", body.toString())
                                                 onSync()
                                             }
                                         },
@@ -182,12 +182,12 @@ AdminStoreModal(onSync)
                                 Spacer(Modifier.height(10.dp))
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Button(
-                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings", JSONObject().put("allow_pay_at_register", !allowReg).put("allow_prepay_stripe", allowStripe).toString()); onSync() } },
+                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings?store_id=$curStoreId", JSONObject().put("allow_pay_at_register", !allowReg).put("allow_prepay_stripe", allowStripe).toString()); onSync() } },
                                         colors = ButtonDefaults.buttonColors(containerColor = if (allowReg) Color(0xFF2563EB) else Color(0xFF475569)),
                                         modifier = Modifier.weight(1f).height(42.dp)
                                     ) { Text(if (allowReg) "💵 Pay at Register: ON" else "💵 Pay at Register: OFF", fontWeight = FontWeight.Bold) }
                                     Button(
-                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings", JSONObject().put("allow_pay_at_register", allowReg).put("allow_prepay_stripe", !allowStripe).toString()); onSync() } },
+                                        onClick = { scope.launch(Dispatchers.IO) { putJson("$BASE_URL/api/settings?store_id=$curStoreId", JSONObject().put("allow_pay_at_register", allowReg).put("allow_prepay_stripe", !allowStripe).toString()); onSync() } },
                                         colors = ButtonDefaults.buttonColors(containerColor = if (allowStripe) Color(0xFF2563EB) else Color(0xFF475569)),
                                         modifier = Modifier.weight(1f).height(42.dp)
                                     ) { Text(if (allowStripe) "💳 Prepay Stripe: ON" else "💳 Prepay Stripe: OFF", fontWeight = FontWeight.Bold) }
