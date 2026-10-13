@@ -28,6 +28,8 @@ data class StoreInfo(val id: Int, val name: String)
 var curStoreId by mutableStateOf(1)
 var curStoreName by mutableStateOf("Neighborhood Deli")
 var storesList by mutableStateOf(listOf<StoreInfo>())
+var masterItems by mutableStateOf(listOf<MenuStockItem>())
+var masterIngs by mutableStateOf(listOf<MenuStockItem>())
 var adminUnlocked by mutableStateOf(false)
 var showAdminDialog by mutableStateOf(false)
 const val BASE_URL = "http://158.101.96.169:3000"
@@ -81,9 +83,12 @@ fun MerchantKdsApp() {
     suspend fun sync() {
         withContext(Dispatchers.IO) {
             try {
-                val stj = JSONArray(URL("$BASE_URL/api/stores").readText())
-storesList = (0 until stj.length()).map { val x=stj.getJSONObject(it); StoreInfo(x.optInt("id"), x.optString("store_name")) }
-storesList.find { it.id == curStoreId }?.let { curStoreName = it.name }
+                val stj=JSONArray(URL("$BASE_URL/api/stores").readText())
+storesList=(0 until stj.length()).map{val x=stj.getJSONObject(it);StoreInfo(x.optInt("id"),x.optString("store_name"))}
+storesList.find{it.id==curStoreId}?.let{curStoreName=it.name}
+val cj=JSONObject(URL("$BASE_URL/api/catalog").readText())
+val cm=cj.getJSONArray("master_items");masterItems=(0 until cm.length()).map{val m=cm.getJSONObject(it);MenuStockItem(m.optInt("id"),m.optString("name"),"Menu",m.optString("price","8.99"),true)}
+val ci=cj.getJSONArray("master_ingredients");masterIngs=(0 until ci.length()).map{val g=ci.getJSONObject(it);MenuStockItem(g.optInt("id"),g.optString("name"),g.optString("category","Ing"),g.optString("add_on_price","0.00"),true)}
 val oj = JSONArray(URL("$BASE_URL/api/orders?store_id=$curStoreId").readText())
                 val pa = mutableListOf<OrderItem>(); val pd = mutableListOf<OrderItem>()
                 for (i in 0 until oj.length()) {
@@ -131,10 +136,9 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
     Row(Modifier.fillMaxSize().background(Color(0xFF12161F))) {
         Column(Modifier.width(225.dp).fillMaxHeight().background(Color(0xFF1A202C)).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("DELI KDS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-Text("🏪 " + curStoreName, color = Color(0xFF38BDF8), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(); if (withTimeoutOrNull(3000) { waitForUpOrCancellation() } == null) showAdminDialog = true } })
-if(adminUnlocked) TextButton(onClick={adminUnlocked=false}){Text("🔓 LOCK & HIDE ADMIN",color=Color(0xFFFBBF24),fontSize=11.sp)}
-AdminStoreModal(onSync)
+                Text("DELI KDS",color=Color.White,fontSize=24.sp,fontWeight=FontWeight.Black)
+Text("🏪 "+curStoreName,color=Color(0xFF38BDF8),fontSize=14.sp,fontWeight=FontWeight.Bold,modifier=Modifier.pointerInput(Unit){awaitEachGesture{awaitFirstDown();if(withTimeoutOrNull(3000){waitForUpOrCancellation()}==null)showAdminDialog=true}})
+AdminPinDialog()
                 Text(if (online) "● LIVE ONLINE" else "● OFFLINE", color = if (online) Color(0xFF48BB78) else Color(0xFFF56565), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 if (isPaused) {
                     Spacer(Modifier.height(6.dp))
@@ -146,11 +150,18 @@ AdminStoreModal(onSync)
                 Button(onClick = { setTab("DONE") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "DONE") Color(0xFF38A169) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("TODAY DONE (${done.size})", fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = { setTab("86") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "86") Color(0xFFE53E3E) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("86 / STOCK", fontWeight = FontWeight.Bold) }
+if(adminUnlocked){
+  Spacer(Modifier.height(10.dp))
+  Button(onClick={setTab("ADMIN")},colors=ButtonDefaults.buttonColors(containerColor=if(tab=="ADMIN")Color(0xFFA855F7)else Color(0xFF2D3748)),modifier=Modifier.fillMaxWidth().height(50.dp)){Text("➕ ADMIN BUILDER",fontWeight=FontWeight.Bold)}
+  TextButton(onClick={adminUnlocked=false;if(tab=="ADMIN")setTab("TICKETS")},modifier=Modifier.fillMaxWidth()){Text("🔓 LOCK & EXIT ADMIN",color=Color(0xFFFBBF24),fontWeight=FontWeight.Bold)}
+}
             }
             Button(onClick = onSync, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A5568)), modifier = Modifier.fillMaxWidth().height(46.dp)) { Text("SYNC NOW", fontWeight = FontWeight.Bold) }
         }
         Box(Modifier.fillMaxSize().padding(16.dp)) {
-            if (tab != "86") {
+            if (tab == "ADMIN") {
+AdminBuilderScreen(onSync)
+} else if (tab != "86") {
                 val list = if (tab == "TICKETS") active else done
                 val isDone = tab == "DONE"
                 LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -240,16 +251,41 @@ fun StockCard(i: MenuStockItem, onToggle: ()->Unit) {
 fun postJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
 fun putJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "PUT"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
 @Composable
-fun AdminStoreModal(onSync: ()->Unit) {
+fun AdminPinDialog() {
   var pw by remember { mutableStateOf("") }
-  if (showAdminDialog) {
-    AlertDialog(onDismissRequest = { showAdminDialog = false },
-      title = { Text("🔒 Super Admin Unlock", fontWeight = FontWeight.Black) },
-      text = { OutlinedTextField(value = pw, onValueChange = { pw = it }, label = { Text("Enter Admin Password") }, singleLine = true) },
-      confirmButton = { Button(onClick = { if (pw == "admin123") { adminUnlocked = true; showAdminDialog = false; pw = "" } }) { Text("Unlock") } },
-      dismissButton = { TextButton(onClick = { showAdminDialog = false; pw = "" }) { Text("Cancel") } })
-  }
-  if (adminUnlocked) {
-    Column { storesList.forEach { s -> Button(onClick = { curStoreId = s.id; curStoreName = s.name; adminUnlocked = false; onSync() }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) { Text("Switch -> " + s.name, fontSize = 11.sp) } } }
+  if (showAdminDialog) AlertDialog(onDismissRequest={showAdminDialog=false}, title={Text("🔒 Super Admin Unlock")}, text={OutlinedTextField(value=pw,onValueChange={pw=it},label={Text("Admin Password")},singleLine=true)}, confirmButton={Button(onClick={if(pw=="admin123"){adminUnlocked=true;showAdminDialog=false;pw=""}}){Text("Unlock")}}, dismissButton={TextButton(onClick={showAdminDialog=false}){Text("Cancel")}})
+}
+@Composable
+fun AdminBuilderScreen(onSync: ()->Unit) {
+  val scope = rememberCoroutineScope()
+  var q by remember { mutableStateOf("") }
+  var pr by remember { mutableStateOf("8.99") }
+  var nm by remember { mutableStateOf("") }
+  var np by remember { mutableStateOf("9.99") }
+  var inNm by remember { mutableStateOf("") }
+  var inCat by remember { mutableStateOf("Topping") }
+  LazyVerticalGrid(columns=GridCells.Fixed(2), horizontalArrangement=Arrangement.spacedBy(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
+      Text("🏪 1. Switch Tablet Deli", color=Color.White, fontWeight=FontWeight.Black)
+      storesList.forEach { s -> Button(onClick={curStoreId=s.id;curStoreName=s.name;onSync()}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)) { Text("Assign -> "+s.name) } }
+    } } }
+    item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
+      Text("🍔 2. Add Master Item (Type 'cho')", color=Color.White, fontWeight=FontWeight.Black)
+      OutlinedTextField(value=q, onValueChange={q=it}, label={Text("🔍 Search Master Item")}, singleLine=true)
+      OutlinedTextField(value=pr, onValueChange={pr=it}, label={Text("Store Price")}, singleLine=true)
+      masterItems.filter{it.name.contains(q,true)}.take(3).forEach { m -> Button(onClick={scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/store-item?store_id=$curStoreId",JSONObject().put("menu_item_id",m.id).put("price",pr).toString());onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)){Text("➕ Add "+m.name+" ($"+pr+")")} }
+    } } }
+    item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
+      Text("✨ 3. Create Brand-New Menu Item", color=Color.White, fontWeight=FontWeight.Black)
+      OutlinedTextField(value=nm, onValueChange={nm=it}, label={Text("New Item Name")}, singleLine=true)
+      OutlinedTextField(value=np, onValueChange={np=it}, label={Text("Price")}, singleLine=true)
+      Button(onClick={if(nm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/new-item?store_id=$curStoreId",JSONObject().put("name",nm).put("price",np).put("description","Freshly made").toString());nm="";onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Create & Add to Store")}
+    } } }
+    item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
+      Text("🧀 4. Add/Create Store Ingredient", color=Color.White, fontWeight=FontWeight.Black)
+      OutlinedTextField(value=inNm, onValueChange={inNm=it}, label={Text("New Ingredient Name")}, singleLine=true)
+      OutlinedTextField(value=inCat, onValueChange={inCat=it}, label={Text("Category (Meat, Cheese, Topping)")}, singleLine=true)
+      Button(onClick={if(inNm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/ing?store_id=$curStoreId",JSONObject().put("name",inNm).put("category",inCat).put("add_on_price",0).toString());inNm="";onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Save Ingredient to Store")}
+    } } }
   }
 }
