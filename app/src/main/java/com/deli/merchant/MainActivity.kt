@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
@@ -130,8 +132,8 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
         Column(Modifier.width(225.dp).fillMaxHeight().background(Color(0xFF1A202C)).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("DELI KDS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-Text("🏪 " + curStoreName, color = Color(0xFF38BDF8), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-TextButton(onClick = { if(adminUnlocked) adminUnlocked = false else showAdminDialog = true }) { Text(if(adminUnlocked) "🔓 LOCK STORE (EXIT ADMIN)" else "🔒 ADMIN LOCKED", color = if(adminUnlocked) Color(0xFFFBBF24) else Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+Text("🏪 " + curStoreName, color = Color(0xFF38BDF8), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(); if (withTimeoutOrNull(3000) { waitForUpOrCancellation() } == null) showAdminDialog = true } })
+if(adminUnlocked) TextButton(onClick={adminUnlocked=false}){Text("🔓 LOCK & HIDE ADMIN",color=Color(0xFFFBBF24),fontSize=11.sp)}
 AdminStoreModal(onSync)
                 Text(if (online) "● LIVE ONLINE" else "● OFFLINE", color = if (online) Color(0xFF48BB78) else Color(0xFFF56565), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 if (isPaused) {
