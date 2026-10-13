@@ -152,7 +152,7 @@ AdminPinDialog()
                 Button(onClick = { setTab("DONE") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "DONE") Color(0xFF38A169) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("TODAY DONE (${done.size})", fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = { setTab("86") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "86") Color(0xFFE53E3E) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("86 / STOCK", fontWeight = FontWeight.Bold) }
-if(adminUnlocked){
+if (true){
   Spacer(Modifier.height(10.dp))
   Button(onClick={setTab("ADMIN")},colors=ButtonDefaults.buttonColors(containerColor=if(tab=="ADMIN")Color(0xFFA855F7)else Color(0xFF2D3748)),modifier=Modifier.fillMaxWidth().height(50.dp)){Text("➕ ADMIN BUILDER",fontWeight=FontWeight.Bold)}
   TextButton(onClick={adminUnlocked=false;if(tab=="ADMIN")setTab("TICKETS")},modifier=Modifier.fillMaxWidth()){Text("🔓 LOCK & EXIT ADMIN",color=Color(0xFFFBBF24),fontWeight=FontWeight.Bold)}
