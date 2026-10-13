@@ -291,6 +291,7 @@ fun AdminBuilderScreen(onSync: ()->Unit) {
       OutlinedTextField(value=inNm, onValueChange={inNm=it}, label={Text("New Ingredient Name")}, singleLine=true)
       OutlinedTextField(value=inCat, onValueChange={inCat=it}, label={Text("Category (Meat, Cheese, Topping)")}, singleLine=true)
       Button(onClick={if(inNm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/ing?store_id=$curStoreId",JSONObject().put("name",inNm).put("category",inCat).put("add_on_price",0).toString());inNm="";onSync();msg("Saved to "+curStoreName+"!")}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Save Ingredient to Store")}
+masterIngs.filter{it.name.contains(inNm,true)}.take(2).forEach{g->Button(onClick={scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/ing?store_id=$curStoreId",JSONObject().put("ingredient_id",g.id).put("add_on_price",0).toString());onSync();msg("Added "+g.name+" to "+curStoreName+"!")}},modifier=Modifier.fillMaxWidth().padding(top=4.dp)){Text("➕ Re-Add Master Ing: "+g.name)}}
     } } }
   }
 }
