@@ -152,7 +152,7 @@ AdminPinDialog()
                 Button(onClick = { setTab("DONE") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "DONE") Color(0xFF38A169) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("TODAY DONE (${done.size})", fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = { setTab("86") }, colors = ButtonDefaults.buttonColors(containerColor = if (tab == "86") Color(0xFFE53E3E) else Color(0xFF2D3748)), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("86 / STOCK", fontWeight = FontWeight.Bold) }
-if (true){
+if (adminUnlocked){
   Spacer(Modifier.height(10.dp))
   Button(onClick={setTab("ADMIN")},colors=ButtonDefaults.buttonColors(containerColor=if(tab=="ADMIN")Color(0xFFA855F7)else Color(0xFF2D3748)),modifier=Modifier.fillMaxWidth().height(50.dp)){Text("➕ ADMIN BUILDER",fontWeight=FontWeight.Bold)}
   TextButton(onClick={adminUnlocked=false;if(tab=="ADMIN")setTab("TICKETS")},modifier=Modifier.fillMaxWidth()){Text("🔓 LOCK & EXIT ADMIN",color=Color(0xFFFBBF24),fontWeight=FontWeight.Bold)}
@@ -240,14 +240,14 @@ fun TicketCard(o: OrderItem, isDone: Boolean, onAdv: (String)->Unit) {
     }
 }
 @Composable
-fun StockCard(i: MenuStockItem, onToggle: ()->Unit, showRemove: Boolean = false, onRemove: ()->Unit = {}) {
+fun StockCard(i: MenuStockItem, onToggle: ()->Unit, onRemove: ()->Unit = {}) {
     Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2433)), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Text(i.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Text("${i.category} • $${i.price}", color = Color(0xFF94A3B8), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Button(onClick = onToggle, colors = ButtonDefaults.buttonColors(containerColor = if (i.available) Color(0xFF059669) else Color(0xFFDC2626)), modifier = Modifier.fillMaxWidth().height(44.dp)) { Text(if (i.available) "IN STOCK (TAP TO 86)" else "86'd / OUT OF STOCK", fontWeight = FontWeight.Bold) }
-if (showRemove) { Spacer(Modifier.height(6.dp)); OutlinedButton(onClick = onRemove, modifier = Modifier.fillMaxWidth().height(36.dp)) { Text("🗑 REMOVE FROM STORE", color = Color(0xFFF87171), fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
+if (adminUnlocked) { Spacer(Modifier.height(6.dp)); OutlinedButton(onClick = onRemove, modifier = Modifier.fillMaxWidth().height(36.dp)) { Text("🗑 REMOVE FROM STORE", color = Color(0xFFF87171), fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
         }
     }
 }
