@@ -1,6 +1,8 @@
 package com.deli.merchant
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import android.view.WindowManager
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -258,6 +260,8 @@ fun AdminPinDialog() {
 @Composable
 fun AdminBuilderScreen(onSync: ()->Unit) {
   val scope = rememberCoroutineScope()
+  val ctx = LocalContext.current
+  fun msg(t:String){scope.launch(Dispatchers.Main){Toast.makeText(ctx,t,Toast.LENGTH_SHORT).show()}}
   var q by remember { mutableStateOf("") }
   var pr by remember { mutableStateOf("8.99") }
   var nm by remember { mutableStateOf("") }
@@ -267,25 +271,25 @@ fun AdminBuilderScreen(onSync: ()->Unit) {
   LazyVerticalGrid(columns=GridCells.Fixed(2), horizontalArrangement=Arrangement.spacedBy(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
     item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
       Text("🏪 1. Switch Tablet Deli", color=Color.White, fontWeight=FontWeight.Black)
-      storesList.forEach { s -> Button(onClick={curStoreId=s.id;curStoreName=s.name;onSync()}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)) { Text("Assign -> "+s.name) } }
+      storesList.forEach { s -> Button(onClick={curStoreId=s.id;curStoreName=s.name;onSync();msg("Switched to "+s.name)}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)) { Text("Assign -> "+s.name) } }
     } } }
     item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
       Text("🍔 2. Add Master Item (Type 'cho')", color=Color.White, fontWeight=FontWeight.Black)
       OutlinedTextField(value=q, onValueChange={q=it}, label={Text("🔍 Search Master Item")}, singleLine=true)
       OutlinedTextField(value=pr, onValueChange={pr=it}, label={Text("Store Price")}, singleLine=true)
-      masterItems.filter{it.name.contains(q,true)}.take(3).forEach { m -> Button(onClick={scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/store-item?store_id=$curStoreId",JSONObject().put("menu_item_id",m.id).put("price",pr).toString());onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)){Text("➕ Add "+m.name+" ($"+pr+")")} }
+      masterItems.filter{it.name.contains(q,true)}.take(3).forEach { m -> Button(onClick={scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/store-item?store_id=$curStoreId",JSONObject().put("menu_item_id",m.id).put("price",pr).toString());onSync();msg("Saved to "+curStoreName+"!")}}, modifier=Modifier.fillMaxWidth().padding(top=4.dp)){Text("➕ Add "+m.name+" ($"+pr+")")} }
     } } }
     item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
       Text("✨ 3. Create Brand-New Menu Item", color=Color.White, fontWeight=FontWeight.Black)
       OutlinedTextField(value=nm, onValueChange={nm=it}, label={Text("New Item Name")}, singleLine=true)
       OutlinedTextField(value=np, onValueChange={np=it}, label={Text("Price")}, singleLine=true)
-      Button(onClick={if(nm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/new-item?store_id=$curStoreId",JSONObject().put("name",nm).put("price",np).put("description","Freshly made").toString());nm="";onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Create & Add to Store")}
+      Button(onClick={if(nm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/new-item?store_id=$curStoreId",JSONObject().put("name",nm).put("price",np).put("description","Freshly made").toString());nm="";onSync();msg("Saved to "+curStoreName+"!")}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Create & Add to Store")}
     } } }
     item { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF1E293B))) { Column(Modifier.padding(12.dp)) {
       Text("🧀 4. Add/Create Store Ingredient", color=Color.White, fontWeight=FontWeight.Black)
       OutlinedTextField(value=inNm, onValueChange={inNm=it}, label={Text("New Ingredient Name")}, singleLine=true)
       OutlinedTextField(value=inCat, onValueChange={inCat=it}, label={Text("Category (Meat, Cheese, Topping)")}, singleLine=true)
-      Button(onClick={if(inNm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/ing?store_id=$curStoreId",JSONObject().put("name",inNm).put("category",inCat).put("add_on_price",0).toString());inNm="";onSync()}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Save Ingredient to Store")}
+      Button(onClick={if(inNm.isNotEmpty())scope.launch(Dispatchers.IO){postJson("$BASE_URL/api/admin/ing?store_id=$curStoreId",JSONObject().put("name",inNm).put("category",inCat).put("add_on_price",0).toString());inNm="";onSync();msg("Saved to "+curStoreName+"!")}}, modifier=Modifier.fillMaxWidth().padding(top=6.dp)){Text("Save Ingredient to Store")}
     } } }
   }
 }
