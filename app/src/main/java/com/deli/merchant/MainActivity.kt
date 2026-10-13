@@ -22,6 +22,12 @@ import java.net.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 
+data class StoreInfo(val id: Int, val name: String)
+var curStoreId by mutableStateOf(1)
+var curStoreName by mutableStateOf("Neighborhood Deli")
+var storesList by mutableStateOf(listOf<StoreInfo>())
+var adminUnlocked by mutableStateOf(false)
+var showAdminDialog by mutableStateOf(false)
 const val BASE_URL = "http://158.101.96.169:3000"
 data class OrderItem(val id: Int, val customerName: String, val pickupTime: String, val itemsSummary: String, val status: String, val paymentStatus: String, val total: String, val timeLabel: String)
 data class MenuStockItem(val id: Int, val name: String, val category: String, val price: String, val available: Boolean)
@@ -73,16 +79,19 @@ fun MerchantKdsApp() {
     suspend fun sync() {
         withContext(Dispatchers.IO) {
             try {
-                val oj = JSONArray(URL("$BASE_URL/api/orders").readText())
+                val stj = JSONArray(URL("$BASE_URL/api/stores").readText())
+storesList = (0 until stj.length()).map { val x=stj.getJSONObject(it); StoreInfo(x.optInt("id"), x.optString("store_name")) }
+storesList.find { it.id == curStoreId }?.let { curStoreName = it.name }
+val oj = JSONArray(URL("$BASE_URL/api/orders?store_id=$curStoreId").readText())
                 val pa = mutableListOf<OrderItem>(); val pd = mutableListOf<OrderItem>()
                 for (i in 0 until oj.length()) {
                     val o = oj.getJSONObject(i); val st = o.optString("status", "Pending"); val cr = o.optString("created_at", "")
                     val itm = OrderItem(o.optInt("id"), o.optString("customer_name", "Walk-In"), o.optString("pickup_time", "ASAP"), o.optString("items", ""), st, o.optString("payment_status", "UNPAID"), o.optString("total_price", "0.00"), fmtTime(cr))
                     if (st != "Picked Up") pa.add(itm) else if (isTodayOrder(cr)) pd.add(itm)
                 }
-                val mj = JSONArray(URL("$BASE_URL/api/menu?all=true").readText())
+                val mj = JSONArray(URL("$BASE_URL/api/menu?store_id=$curStoreId").readText())
                 menu = (0 until mj.length()).map { val m = mj.getJSONObject(it); MenuStockItem(m.optInt("id"), m.optString("name"), m.optString("category", "Menu"), m.optString("price", "0.00"), m.optBoolean("is_available", true)) }
-                val ij = JSONArray(URL("$BASE_URL/api/ingredients").readText())
+                val ij = JSONArray(URL("$BASE_URL/api/ingredients?store_id=$curStoreId").readText())
                 ings = (0 until ij.length()).map { val g = ij.getJSONObject(it); MenuStockItem(g.optInt("id"), g.optString("name"), g.optString("category", "Ing"), g.optString("extra_price", "0.00"), g.optBoolean("is_available", true)) }
                 val sj = JSONObject(URL("$BASE_URL/api/settings").readText())
                 val r = sj.optBoolean("allow_pay_at_register", true)
@@ -121,6 +130,9 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
         Column(Modifier.width(225.dp).fillMaxHeight().background(Color(0xFF1A202C)).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("DELI KDS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+Text("🏪 " + curStoreName, color = Color(0xFF38BDF8), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+TextButton(onClick = { if(adminUnlocked) adminUnlocked = false else showAdminDialog = true }) { Text(if(adminUnlocked) "🔓 LOCK STORE (EXIT ADMIN)" else "🔒 ADMIN LOCKED", color = if(adminUnlocked) Color(0xFFFBBF24) else Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+AdminStoreModal(onSync)
                 Text(if (online) "● LIVE ONLINE" else "● OFFLINE", color = if (online) Color(0xFF48BB78) else Color(0xFFF56565), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 if (isPaused) {
                     Spacer(Modifier.height(6.dp))
@@ -184,9 +196,9 @@ fun KdsLayout(tab: String, setTab: (String)->Unit, active: List<OrderItem>, done
                         }
                     }
                     item(span = { GridItemSpan(3) }) { Text("MENU ITEMS (${menu.size})", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black) }
-                    items(menu) { m -> StockCard(m) { scope.launch(Dispatchers.IO) { postJson("$BASE_URL/api/menu/${m.id}/availability", JSONObject().put("is_available", !m.available).toString()); onSync() } } }
+                    items(menu) { m -> StockCard(m) { scope.launch(Dispatchers.IO) { postJson("$BASE_URL/api/menu/${m.id}/availability?store_id=$curStoreId", JSONObject().put("is_available", !m.available).toString()); onSync() } } }
                     item(span = { GridItemSpan(3) }) { Text("INGREDIENTS (${ings.size})", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black) }
-                    items(ings) { g -> StockCard(g) { scope.launch(Dispatchers.IO) { postJson("$BASE_URL/api/ingredients/${g.id}/availability", JSONObject().put("is_available", !g.available).toString()); onSync() } } }
+                    items(ings) { g -> StockCard(g) { scope.launch(Dispatchers.IO) { postJson("$BASE_URL/api/ingredients/${g.id}/availability?store_id=$curStoreId", JSONObject().put("is_available", !g.available).toString()); onSync() } } }
                 }
             }
         }
@@ -225,3 +237,17 @@ fun StockCard(i: MenuStockItem, onToggle: ()->Unit) {
 }
 fun postJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
 fun putJson(u: String, b: String) { try { (URL(u).openConnection() as HttpURLConnection).apply { requestMethod = "PUT"; doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(b.toByteArray()) }; inputStream.close() } } catch (_: Exception) {} }
+@Composable
+fun AdminStoreModal(onSync: ()->Unit) {
+  var pw by remember { mutableStateOf("") }
+  if (showAdminDialog) {
+    AlertDialog(onDismissRequest = { showAdminDialog = false },
+      title = { Text("🔒 Super Admin Unlock", fontWeight = FontWeight.Black) },
+      text = { OutlinedTextField(value = pw, onValueChange = { pw = it }, label = { Text("Enter Admin Password") }, singleLine = true) },
+      confirmButton = { Button(onClick = { if (pw == "admin123") { adminUnlocked = true; showAdminDialog = false; pw = "" } }) { Text("Unlock") } },
+      dismissButton = { TextButton(onClick = { showAdminDialog = false; pw = "" }) { Text("Cancel") } })
+  }
+  if (adminUnlocked) {
+    Column { storesList.forEach { s -> Button(onClick = { curStoreId = s.id; curStoreName = s.name; adminUnlocked = false; onSync() }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) { Text("Switch -> " + s.name, fontSize = 11.sp) } } }
+  }
+}
